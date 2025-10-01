@@ -1,9 +1,34 @@
+org: gauravssh
+app: switch-to-microservices
 service: php-monolith-to-serverless-nodejs
 
 provider:
   name: aws
   runtime: nodejs18.x
   region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  environment:
+    STAGE: ${self:provider.stage}
+    ORDERS_TABLE: orders-${self:provider.stage}
+    REPORTS_BUCKET: reports-${self:provider.stage}-${aws:accountId}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+      Resource:
+        - arn:aws:dynamodb:${self:provider.region}:*:table/orders-${self:provider.stage}
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+        - s3:GetObject
+        - s3:ListBucket
+      Resource:
+        - arn:aws:s3:::reports-${self:provider.stage}-${aws:accountId}
+        - arn:aws:s3:::reports-${self:provider.stage}-${aws:accountId}/*
 
 functions:
   auth:
@@ -15,6 +40,8 @@ functions:
 
   orders:
     handler: lambda-services/orders/handler.handler
+    environment:
+      ORDERS_TABLE: ${self:provider.environment.ORDERS_TABLE}
     events:
       - httpApi:
           path: /orders
@@ -22,7 +49,32 @@ functions:
 
   reports:
     handler: lambda-services/reports/handler.handler
+    environment:
+      REPORTS_BUCKET: ${self:provider.environment.REPORTS_BUCKET}
     events:
       - httpApi:
           path: /reports
           method: get
+
+resources:
+  Resources:
+    OrdersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.ORDERS_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: orderId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: orderId
+            KeyType: HASH
+
+    ReportsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:provider.environment.REPORTS_BUCKET}
+
+outputs:
+  apiEndpoint:
+    value: !Ref HttpApi
