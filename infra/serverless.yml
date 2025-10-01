@@ -1,0 +1,28 @@
+service: php-monolith-to-serverless-nodejs
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+
+functions:
+  auth:
+    handler: lambda-services/auth/handler.handler
+    events:
+      - httpApi:
+          path: /auth
+          method: post
+
+  orders:
+    handler: lambda-services/orders/handler.handler
+    events:
+      - httpApi:
+          path: /orders
+          method: post
+
+  reports:
+    handler: lambda-services/reports/handler.handler
+    events:
+      - httpApi:
+          path: /reports
+          method: get
